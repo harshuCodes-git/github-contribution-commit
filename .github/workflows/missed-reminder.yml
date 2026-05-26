@@ -1,0 +1,52 @@
+name: Missed Commit Reminder
+on:
+  schedule:
+    - cron: "20 19 * * *"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check if commit was made today
+        id: check
+        run: |
+          TODAY=$(date -u '+%Y-%m-%d')
+          if grep -q "$TODAY" README.md 2>/dev/null; then
+            echo "committed=true" >> $GITHUB_OUTPUT
+          else
+            echo "committed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create reminder issue
+        if: steps.check.outputs.committed == 'false'
+        run: |
+          DATE=$(date -u '+%Y-%m-%d')
+          RUN_URL="https://github.com/${{ github.repository }}/actions/workflows/daily-commit.yml"
+          gh issue create \
+            --title "Daily commit missed: $DATE" \
+            --body "No commit was made for **$DATE**.
+
+            [▶️ Run workflow now]($RUN_URL)
+
+            _(This issue will auto-close when the commit is pushed.)_" \
+            --label "automated,reminder"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Auto-close issues if commit exists
+        if: steps.check.outputs.committed == 'true'
+        run: |
+          ISSUES=$(gh issue list --label "reminder" --json number --jq '.[].number' 2>/dev/null)
+          if [ -n "$ISSUES" ]; then
+            echo "$ISSUES" | while read num; do
+              gh issue close "$num" --comment "Commit detected. Closing."
+            done
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
