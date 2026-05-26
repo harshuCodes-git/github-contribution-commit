@@ -1,3 +1,3 @@
-# Daily Commit Contribution
+# GitHub Contribution Commit
 
-This repo uses a GitHub Action to make a daily commit.
+Daily auto-commits to keep the contribution graph active.
